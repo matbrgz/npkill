@@ -38,6 +38,7 @@ export class ResultsUi extends HeavyUi implements InteractiveUi {
   readonly showDetails$ = new Subject<CliScanFoundFolder>();
   readonly goOptions$ = new Subject<null>();
   readonly endNpkill$ = new Subject<null>();
+  readonly cycleSort$ = new Subject<null>();
 
   private readonly config: IConfig = DEFAULT_CONFIG;
   private readonly KEYS = {
@@ -60,6 +61,7 @@ export class ResultsUi extends HeavyUi implements InteractiveUi {
     right: () => this.showDetails(),
     left: () => this.goOptions(),
     q: () => this.endNpkill(),
+    s: () => this.cycleSort(),
     t: () => this.toggleSelectMode(),
     return: () => this.deleteSelected(),
     enter: () => this.deleteSelected(),
@@ -94,6 +96,10 @@ export class ResultsUi extends HeavyUi implements InteractiveUi {
 
   private endNpkill(): void {
     this.endNpkill$.next(null);
+  }
+
+  private cycleSort(): void {
+    this.cycleSort$.next(null);
   }
 
   private toggleSelectMode(): void {

@@ -54,13 +54,12 @@ export class OptionsUi extends BaseUi implements InteractiveUi {
 
   private initializeOptions(): void {
     this.options = [
+      // SEARCH
       {
         label: 'Target folder',
         type: 'input',
         key: 'targets',
-        value: Array.isArray(this.config.targets)
-          ? this.config.targets.join(',')
-          : '',
+        value: this.config.targets,
       },
       {
         label: 'Cwd',
@@ -72,10 +71,16 @@ export class OptionsUi extends BaseUi implements InteractiveUi {
         label: 'Exclude',
         type: 'input',
         key: 'exclude',
-        value: Array.isArray(this.config.exclude)
-          ? this.config.exclude.join(',')
-          : '',
+        value: this.config.exclude,
       },
+      {
+        label: 'Exclude hidden dirs.',
+        type: 'checkbox',
+        key: 'excludeHiddenDirectories',
+        value: this.config.excludeHiddenDirectories,
+      },
+
+      // DISPLAY
       {
         label: 'Sort by',
         type: 'dropdown',
@@ -90,12 +95,8 @@ export class OptionsUi extends BaseUi implements InteractiveUi {
         value: this.config.sizeUnit,
         options: ['auto', 'mb', 'gb'],
       },
-      {
-        label: 'Exclude hidden dirs.',
-        type: 'checkbox',
-        key: 'excludeHiddenDirectories',
-        value: this.config.excludeHiddenDirectories,
-      },
+
+      // SAFETY
       {
         label: 'Dry-run mode',
         type: 'checkbox',
@@ -148,8 +149,9 @@ export class OptionsUi extends BaseUi implements InteractiveUi {
       this.render();
     } else if (opt.type === 'input') {
       this.isEditing = true;
-      // Convertir el valor existente a string para el buffer de edición
-      this.editBuffer = String(opt.value);
+      // Convert value to string for current edit buffer
+      const val = opt.value;
+      this.editBuffer = Array.isArray(val) ? val.join(',') : String(val);
       this.render();
     }
   }
@@ -165,14 +167,17 @@ export class OptionsUi extends BaseUi implements InteractiveUi {
 
     if (name === 'return') {
       if (opt.key === 'targets' || opt.key === 'exclude') {
-        const arrValue = this.editBuffer
+        const arrValue: string[] = this.editBuffer
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean);
         this.config[opt.key] = arrValue;
         this.emitConfigChange(opt.key, arrValue);
-        opt.value = this.editBuffer;
+        // Correctly assign array back to value
+        // We need to cast or ensure type safety, but essentially we are putting back the correct type
+        (opt.value as string[]) = arrValue; 
       } else {
+
         const key = opt.key as keyof Pick<
           IConfig,
           {
@@ -237,56 +242,71 @@ export class OptionsUi extends BaseUi implements InteractiveUi {
     this.printHintMessage();
     let currentRow = MARGINS.ROW_RESULTS_START;
 
-    this.printAt(pc.bold(pc.bgYellow(pc.black('  OPTIONS  '))), {
+    // Header
+    this.printAt(pc.bgBlue(pc.black(pc.bold('  OPTIONS MENU  '))), {
       x: 1,
       y: currentRow++,
     });
     currentRow++;
 
-    for (let i = 0; i < this.options.length; i++) {
-      const opt = this.options[i];
-      const isSelected = i === this.selectedIndex;
-      const label = `${opt.label.padEnd(16)}`;
+    const groups = [
+      { name: 'SEARCH', items: ['targets', 'folderRoot', 'exclude', 'excludeHiddenDirectories'] },
+      { name: 'DISPLAY', items: ['sortBy', 'sizeUnit'] },
+      { name: 'SAFETY', items: ['dryRun'] },
+    ];
 
-      let valueText = '';
-      if (opt.type === 'checkbox') {
-        valueText = opt.value ? '[x]' : '[ ]';
-      } else if (opt.type === 'dropdown') {
-        valueText = `${opt.value}`;
-      } else if (opt.type === 'input') {
-        valueText =
-          this.isEditing && isSelected
-            ? this.editBuffer + '_'
-            : String(opt.value);
-      }
+    let optionIndex = 0;
 
-      const line = `${isSelected ? pc.bgCyan(' ') : ' '} ${label}${valueText}`;
-      this.printAt(isSelected ? pc.cyan(line) : line, {
-        x: 2,
-        y: currentRow++,
-      });
+    for (const group of groups) {
+      if (currentRow >= this.terminal.rows - 2) break; // Integrity check
 
-      // If selected and dropdown, show options
-      if (opt.type === 'dropdown' && isSelected) {
-        const dropdownOptions = opt.options || [];
-        const optionsNumber = dropdownOptions.length;
-        const maxLength =
-          dropdownOptions.length > 0
-            ? Math.max(...dropdownOptions.map((o) => o.length))
-            : 0;
-        for (let i = 0; i < optionsNumber; i++) {
-          const option = dropdownOptions[i];
-          const paddedOption = option.padEnd(maxLength, ' ');
-          const optionEntryText =
-            option === opt.value
-              ? pc.bgCyan(pc.black(` ${paddedOption} `))
-              : pc.bgBlack(pc.white(` ${paddedOption} `));
-          this.printAt(optionEntryText, {
-            x: 34,
-            y: currentRow - Math.round(optionsNumber / 2) + i,
-          });
+      // Print Group Header
+      this.printAt(pc.gray(`[ ${group.name} ]`), { x: 2, y: currentRow++ });
+
+      const groupOptions = this.options.filter(opt => group.items.includes(opt.key));
+
+      for (const opt of groupOptions) {
+        // Find the original index of this option in the main list to handle global selection index
+        const globalIndex = this.options.findIndex(o => o.key === opt.key);
+        const isSelected = globalIndex === this.selectedIndex;
+        
+        const label = `${opt.label.padEnd(20)}`;
+        let valueText = '';
+        
+        if (opt.type === 'checkbox') {
+          valueText = opt.value ? pc.green('Enabled') : pc.red('Disabled');
+        } else if (opt.type === 'dropdown') {
+          valueText = pc.yellow(`${opt.value}`);
+        } else if (opt.type === 'input') {
+          valueText =
+            this.isEditing && isSelected
+              ? pc.blue(this.editBuffer + '_')
+              : pc.cyan(String(opt.value || '')); // Show empty string if null/undefined
+            
+          // Truncate if too long for display
+          if (!this.isEditing && valueText.length > 30) {
+             valueText = valueText.substring(0, 27) + '...';
+          }
+        }
+
+        // Selection Marker
+        const marker = isSelected ? pc.cyan('>') : ' ';
+        const line = `${marker} ${label} ${valueText}`;
+        
+        this.printAt(line, { x: 4, y: currentRow++ });
+
+        // If selected and dropdown, show options below
+        if (opt.type === 'dropdown' && isSelected) {
+          const dropdownOptions = opt.options || [];
+          const optionsText = dropdownOptions.map(o => 
+            o === opt.value ? pc.bgCyan(pc.black(` ${o} `)) : pc.gray(` ${o} `)
+          ).join(' ');
+          
+          this.printAt(`    ${optionsText}`, { x: 25, y: currentRow++ });
+          currentRow++; // Extra space after dropdown
         }
       }
+      currentRow++; // Space between groups
     }
   }
 

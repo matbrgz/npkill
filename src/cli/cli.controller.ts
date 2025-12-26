@@ -160,6 +160,7 @@ export class CliController {
     );
     this.uiResults.endNpkill$.subscribe(() => this.quit());
     this.uiResults.goOptions$.subscribe(() => this.openOptions());
+    this.uiResults.cycleSort$.subscribe(() => this.cycleSortOption());
 
     // Activate the main interactive component
     this.activeComponent = this.uiResults;
@@ -563,6 +564,17 @@ export class CliController {
 
   private isValidSortParam(sortName: string): boolean {
     return Object.keys(FOLDER_SORT).includes(sortName);
+  }
+
+  private cycleSortOption(): void {
+    const sortOptions = Object.keys(FOLDER_SORT);
+    const currentIndex = sortOptions.indexOf(this.config.sortBy);
+    const nextIndex = (currentIndex + 1) % sortOptions.length;
+    this.config.sortBy = sortOptions[nextIndex];
+    this.resultsService.sortResults(this.config.sortBy);
+    this.uiResults.clear();
+    this.uiService.renderAll();
+    this.logger.info(`Sort changed to: ${this.config.sortBy}`);
   }
 
   private isValidSizeUnit(sizeUnit: string): boolean {

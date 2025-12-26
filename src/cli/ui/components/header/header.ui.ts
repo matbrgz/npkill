@@ -61,6 +61,55 @@ export class HeaderUi extends BaseUi {
       pc.gray(INFO_MSGS.SPACE_RELEASED + DEFAULT_SIZE),
       UI_POSITIONS.SPACE_RELEASED,
     );
+
+    // Sort indicator
+    if (this.activeMenuIndex === MENU_BAR_OPTIONS.DELETE) {
+      this.renderSortIndicator();
+    }
+  }
+
+  private renderSortIndicator(): void {
+    const sortLabel = this.getSortLabel(this.config.sortBy);
+    
+    // Shortened controls hint to fit smaller screens and avoid overlap
+    const controlsHint = 
+      pc.bold('Arrows') + pc.gray(':nav ') +
+      pc.bold('SPC') + pc.gray(':del ') +
+      pc.bold('s') + pc.gray(':sort ') +
+      pc.bold('h') + pc.gray(':help ') +
+      pc.bold('q') + pc.gray(':quit');
+    
+    // Position below the banner (row 6), careful not to overwrite dry-run if present (but dry-run is usually explicit)
+    // If dry-run is active, it prints at (1, 6). We can print at x=20 or similar if needed, or row 7.
+    // Let's use row 6 but offset if dry-run is on, or just assume enough space.
+    // Actually, UI_POSITIONS.DRY_RUN_NOTICE is { x: 1, y: 6 }.
+    // Let's put hints at Row 6, X = 25 (after dry run notice area) seems safe?
+    // Or Row 4 (under banner). Banner is 5 lines (0-4). So row 5 is Version. Row 6 is Dry Run.
+    
+    const controlsRow = 6;
+    const controlsX = this.config.dryRun ? 20 : 1; 
+
+    // Clear previous line area for hints
+    this.printAt(' '.repeat(60), { x: 1, y: controlsRow });
+    this.printAt(controlsHint, { x: controlsX, y: controlsRow });
+    
+    // Sort indicator on left side of version row (Line 5)
+    // UI_POSITIONS.VERSION is { x: 30, y: 5 }.
+    // We should print sort indicator at x=1, y=5.
+    const sortText = pc.cyan(`Sort: ${sortLabel}`); 
+    // Clear sort area
+    this.printAt(' '.repeat(28), { x: 1, y: UI_POSITIONS.VERSION.y });
+    this.printAt(sortText, { x: 1, y: UI_POSITIONS.VERSION.y });
+  }
+
+  private getSortLabel(sortBy: string): string {
+    const labels: Record<string, string> = {
+      'path': 'Path',
+      'size': 'Size',
+      'last-mod': 'Age',
+      'none': 'None',
+    };
+    return labels[sortBy] || sortBy;
   }
 
   private renderHeader(): void {
